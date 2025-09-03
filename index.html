@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket Arbitrage Scanner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #0B0E11;
+            color: #C3C4C6;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #151A21;
+            border-bottom: 1px solid #2B3139;
+            padding: 12px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #00D4FF 0%, #0099CC 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #00D4FF;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #151A21;
+            border-radius: 12px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 80px;
+        }
+
+        .filter-section {
+            margin-bottom: 25px;
+        }
+
+        .filter-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .filter-input {
+            width: 100%;
+            padding: 10px 14px;
+            background: #0B0E11;
+            border: 1px solid #2B3139;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #00D4FF;
+            background: #0F1419;
+        }
+
+        .filter-range {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-range input {
+            width: 50%;
+        }
+
+        /* Category Tabs */
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 16px 20px;
+            background: #151A21;
+            border-bottom: 1px solid #2B3139;
+            overflow-x: auto;
+            margin: 0 -20px 20px -20px;
+        }
+
+        .category-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid #2B3139;
+            border-radius: 20px;
+            color: #6B7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .category-tab:hover {
+            border-color: #3B4149;
+            color: #fff;
+        }
+
+        .category-tab.active {
+            background: #00D4FF;
+            border-color: #00D4FF;
+            color: #000;
+        }
+
+        .category-tab .count {
+            margin-left: 6px;
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Arbitrage Cards */
+        .arb-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .arb-card {
+            background: #151A21;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2B3139;
+            transition: all 0.2s;
+        }
+
+        .arb-card:hover {
+            border-color: #3B4149;
+            transform: translateY(-2px);
+        }
+
+        .arb-header {
+            padding: 16px 20px;
+            background: linear-gradient(90deg, #151A21 0%, #1A1F26 100%);
+            border-bottom: 1px solid #2B3139;
+        }
+
+        .arb-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .market-question {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            flex: 1;
+        }
+
+        .arb-badge {
+            padding: 4px 10px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .arb-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #6B7280;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Market Comparison */
+        .market-comparison {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .market-side {
+            background: #0B0E11;
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid #2B3139;
+        }
+
+        .market-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .outcome-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .price-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .price-label {
+            font-size: 13px;
+            color: #6B7280;
+        }
+
+        .price-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .price-yes {
+            color: #10B981;
+        }
+
+        .price-no {
+            color: #EF4444;
+        }
+
+        .volume-info {
+            font-size: 12px;
+            color: #6B7280;
+            padding-top: 8px;
+            border-top: 1px solid #2B3139;
+        }
+
+        /* VS Divider */
+        .vs-divider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .vs-text {
+            padding: 6px 12px;
+            background: #2B3139;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+        }
+
+        .profit-display {
+            text-align: center;
+        }
+
+        .profit-amount {
+            font-size: 24px;
+            font-weight: 700;
+            color: #10B981;
+            margin-bottom: 4px;
+        }
+
+        .profit-label {
+            font-size: 11px;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Action Section */
+        .arb-actions {
+            padding: 16px 20px;
+            background: #0B0E11;
+            border-top: 1px solid #2B3139;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .action-info {
+            display: flex;
+            gap: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #6B7280;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: #00D4FF;
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            background: #00A8D4;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #00D4FF;
+            border: 1px solid #00D4FF;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-active {
+            background: #10B981;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            font-size: 12px;
+            color: #10B981;
+            margin-left: 20px;
+        }
+
+        .latency {
+            font-weight: 600;
+        }
+
+        .position-calc {
+            background: #0B0E11;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid #2B3139;
+        }
+
+        .calc-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #00D4FF;
+            margin-bottom: 12px;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .calc-label {
+            color: #6B7280;
+        }
+
+        .calc-value {
+            color: #10B981;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                <span>Polymarket Arbitrage Scanner</span>
+                <div class="connection-status">
+                    <span class="status-indicator status-active"></span>
+                    <span>Connected</span>
+                    <span class="latency">12ms</span>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat">
+                    <div class="stat-value" id="totalArbs">0</div>
+                    <div class="stat-label">Active Arbs</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="avgProfit">0%</div>
+                    <div class="stat-label">Avg Profit</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="bestArb">0%</div>
+                    <div class="stat-label">Best Arb</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="scanRate">247/s</div>
+                    <div class="stat-label">Scan Rate</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="filter-section">
+                <div class="filter-title">Profit Range</div>
+                <div class="filter-range">
+                    <input type="number" class="filter-input" id="minProfit" placeholder="Min %" value="0.5">
+                    <input type="number" class="filter-input" id="maxProfit" placeholder="Max %">
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Volume Filter</div>
+                <input type="number" class="filter-input" id="minVolume" placeholder="Min volume ($)" value="10000">
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Liquidity Filter</div>
+                <input type="number" class="filter-input" id="minLiquidity" placeholder="Min liquidity ($)" value="5000">
+            </div>
+
+            <div class="position-calc">
+                <div class="calc-title">Position Calculator</div>
+                <input type="number" class="filter-input" id="bankroll" placeholder="Bankroll ($)" value="10000" style="margin-bottom: 10px;">
+                <div id="positionOutput"></div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="category-tabs">
+                <button class="category-tab active" onclick="filterCategory('all')">
+                    All <span class="count">0</span>
+                </button>
+                <button class="category-tab" onclick="filterCategory('politics')">
+                    Politics <span class="count">0</span>
+                </button>
+                <button class="category-tab" onclick="filterCategory('sports')">
+                    Sports <span class="count">0</span>
+                </button>
+                <button class="category-tab" onclick="filterCategory('crypto')">
+                    Crypto <span class="count">0</span>
+                </button>
+                <button class="category-tab" onclick="filterCategory('economics')">
+                    Economics <span class="count">0</span>
+                </button>
+            </div>
+
+            <div class="arb-grid" id="arbGrid">
+                <!-- Arbitrage opportunities will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let arbitrageOpportunities = [];
+        let currentCategory = 'all';
+        let ws = null;
+        let reconnectAttempts = 0;
+
+        // Initialize on page load
+        function initializeApp() {
+            generateArbitrageOpportunities();
+            renderOpportunities();
+            updateStats();
+            connectWebSocket();
+            startLiveUpdates();
+        }
+
+        // Generate sample arbitrage opportunities
+        function generateArbitrageOpportunities() {
+            arbitrageOpportunities = [
+                {
+                    id: 1,
+                    type: 'cross',
+                    category: 'politics',
+                    market1: {
+                        question: "Who will Trump meet with in September?",
+                        outcome: "Vladimir Putin",
+                        yesPrice: 0.04,
+                        noPrice: 0.93,
+                        volume: 32299,
+                        liquidity: 25000
+                    },
+                    market2: {
+                        question: "Will Trump meet with Putin again by...?",
+                        outcome: "September 30",
+                        yesPrice: 0.06,
+                        noPrice: 0.91,
+                        volume: 166178,
+                        liquidity: 45000
+                    },
+                    profit: 3.09,
+                    investment: 0.97,
+                    correlation: 85,
+                    timestamp: Date.now()
+                },
+                {
+                    id: 2,
+                    type: 'same',
+                    category: 'sports',
+                    market1: {
+                        question: "Lakers win NBA Championship?",
+                        outcome: "YES",
+                        yesPrice: 0.45,
+                        noPrice: 0.52,
+                        volume: 250000,
+                        liquidity: 100000
+                    },
+                    market2: {
+                        question: "Lakers win NBA Championship?",
+                        outcome: "NO",
+                        yesPrice: 0.52,
+                        noPrice: 0.45,
+                        volume: 250000,
+                        liquidity: 100000
+                    },
+                    profit: 3.09,
+                    investment: 0.97,
+                    correlation: 100,
+                    timestamp: Date.now()
+                },
+                {
+                    id: 3,
+                    type: 'cross',
+                    category: 'crypto',
+                    market1: {
+                        question: "Bitcoin above $100k by December?",
+                        outcome: "YES",
+                        yesPrice: 0.35,
+                        noPrice: 0.63,
+                        volume: 500000,
+                        liquidity: 200000
+                    },
+                    market2: {
+                        question: "Bitcoin new ATH in 2024?",
+                        outcome: "YES", 
+                        yesPrice: 0.62,
+                        noPrice: 0.35,
+                        volume: 450000,
+                        liquidity: 180000
+                    },
+                    profit: 2.04,
+                    investment: 0.98,
+                    correlation: 78,
+                    timestamp: Date.now()
+                },
+                {
+                    id: 4,
+                    type: 'same',
+                    category: 'economics',
+                    market1: {
+                        question: "GDP growth exceeds 3% in Q4?",
+                        outcome: "YES",
+                        yesPrice: 0.58,
+                        noPrice: 0.40,
+                        volume: 180000,
+                        liquidity: 75000
+                    },
+                    market2: {
+                        question: "GDP growth exceeds 3% in Q4?",
+                        outcome: "NO",
+                        yesPrice: 0.40,
+                        noPrice: 0.58,
+                        volume: 180000,
+                        liquidity: 75000
+                    },
+                    profit: 2.04,
+                    investment: 0.98,
+                    correlation: 100,
+                    timestamp: Date.now()
+                }
+            ];
+        }
+
+        // Render opportunities
+        function renderOpportunities() {
+            const grid = document.getElementById('arbGrid');
+            const filtered = filterOpportunities();
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div style="text-align: center; padding: 60px; color: #6B7280;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                        <div style="font-size: 18px;">No arbitrage opportunities found</div>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(opp => `
+                <div class="arb-card">
+                    <div class="arb-header">
+                        <div class="arb-title">
+                            <div class="market-question">
+                                ${opp.type === 'cross' ? 'Cross-Market Arbitrage' : 'Same-Market Arbitrage'}
+                                <span style="margin-left: 10px; color: #A855F7; font-size: 12px;">
+                                    ${opp.correlation}% correlation
+                                </span>
+                            </div>
+                            <div class="arb-badge">
+                                💰 ${opp.profit.toFixed(2)}% PROFIT
+                            </div>
+                        </div>
+                        <div class="arb-meta">
+                            <div class="meta-item">📁 ${opp.category}</div>
+                            <div class="meta-item">💵 $${(opp.market1.volume + opp.market2.volume).toLocaleString()} Vol</div>
+                            <div class="meta-item">⏱️ Live</div>
+                        </div>
+                    </div>
+                    
+                    <div class="market-comparison">
+                        <div class="market-side">
+                            <div class="market-label">Market A</div>
+                            <div class="outcome-name">${opp.market1.outcome}</div>
+                            <div class="price-info">
+                                <span class="price-label">Buy YES</span>
+                                <span class="price-value price-yes">$${opp.market1.yesPrice.toFixed(3)}</span>
+                            </div>
+                            <div class="price-info">
+                                <span class="price-label">Buy NO</span>
+                                <span class="price-value price-no">$${opp.market1.noPrice.toFixed(3)}</span>
+                            </div>
+                            <div class="volume-info">
+                                Volume: $${opp.market1.volume.toLocaleString()}
+                            </div>
+                        </div>
+                        
+                        <div class="vs-divider">
+                            <div class="vs-text">ARB</div>
+                            <div class="profit-display">
+                                <div class="profit-amount">+${opp.profit.toFixed(2)}%</div>
+                                <div class="profit-label">Net Profit</div>
+                            </div>
+                        </div>
+                        
+                        <div class="market-side">
+                            <div class="market-label">Market B</div>
+                            <div class="outcome-name">${opp.market2.outcome}</div>
+                            <div class="price-info">
+                                <span class="price-label">Buy YES</span>
+                                <span class="price-value price-yes">$${opp.market2.yesPrice.toFixed(3)}</span>
+                            </div>
+                            <div class="price-info">
+                                <span class="price-label">Buy NO</span>
+                                <span class="price-value price-no">$${opp.market2.noPrice.toFixed(3)}</span>
+                            </div>
+                            <div class="volume-info">
+                                Volume: $${opp.market2.volume.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="arb-actions">
+                        <div class="action-info">
+                            <div class="info-item">
+                                <div class="info-value">$${opp.investment.toFixed(2)}</div>
+                                <div class="info-label">Investment</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-value">$1.00</div>
+                                <div class="info-label">Return</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-value">$${((1 - opp.investment) * 1000).toFixed(2)}</div>
+                                <div class="info-label">Profit on $1k</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" onclick="calculatePosition(${opp.id})">Calculate</button>
+                            <button class="btn btn-primary" onclick="executeTrade(${opp.id})">Execute</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Filter opportunities
+        function filterOpportunities() {
+            const minProfit = parseFloat(document.getElementById('minProfit').value) || 0;
+            const maxProfit = parseFloat(document.getElementById('maxProfit').value) || 100;
+            const minVolume = parseFloat(document.getElementById('minVolume').value) || 0;
+            const minLiquidity = parseFloat(document.getElementById('minLiquidity').value) || 0;
+            
+            return arbitrageOpportunities.filter(opp => {
+                const totalVolume = opp.market1.volume + opp.market2.volume;
+                const minLiq = Math.min(opp.market1.liquidity, opp.market2.liquidity);
+                
+                return opp.profit >= minProfit &&
+                       opp.profit <= maxProfit &&
+                       totalVolume >= minVolume &&
+                       minLiq >= minLiquidity &&
+                       (currentCategory === 'all' || opp.category === currentCategory);
+            });
+        }
+
+        // Update stats
+        function updateStats() {
+            const filtered = filterOpportunities();
+            document.getElementById('totalArbs').textContent = filtered.length;
+            
+            if (filtered.length > 0) {
+                const avgProfit = filtered.reduce((sum, opp) => sum + opp.profit, 0) / filtered.length;
+                const bestArb = Math.max(...filtered.map(opp => opp.profit));
+                document.getElementById('avgProfit').textContent = avgProfit.toFixed(1) + '%';
+                document.getElementById('bestArb').textContent = bestArb.toFixed(1) + '%';
+            } else {
+                document.getElementById('avgProfit').textContent = '0%';
+                document.getElementById('bestArb').textContent = '0%';
+            }
+            
+            // Update category counts
+            updateCategoryCounts();
+        }
+
+        // Update category counts
+        function updateCategoryCounts() {
+            const categories = ['all', 'politics', 'sports', 'crypto', 'economics'];
+            categories.forEach((cat, index) => {
+                const count = cat === 'all' ? 
+                    arbitrageOpportunities.length : 
+                    arbitrageOpportunities.filter(a => a.category === cat).length;
+                    
+                document.querySelectorAll('.category-tab .count')[index].textContent = count;
+            });
+        }
+
+        // Filter by category
+        function filterCategory(category) {
+            currentCategory = category;
+            document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            renderOpportunities();
+            updateStats();
+        }
+
+        // WebSocket connection (simulated)
+        function connectWebSocket() {
+            // In production, connect to real WebSocket
+            // ws = new WebSocket('wss://ws.polymarket.com/markets');
+            console.log('WebSocket connected (simulated)');
+        }
+
+        // Live updates
+        function startLiveUpdates() {
+            setInterval(() => {
+                // Simulate price changes
+                arbitrageOpportunities.forEach(opp => {
+                    const change = (Math.random() - 0.5) * 0.002;
+                    opp.market1.yesPrice = Math.max(0.01, Math.min(0.99, opp.market1.yesPrice + change));
+                    opp.market1.noPrice = Math.max(0.01, Math.min(0.99, opp.market1.noPrice - change));
+                    opp.market2.yesPrice = Math.max(0.01, Math.min(0.99, opp.market2.yesPrice - change));
+                    opp.market2.noPrice = Math.max(0.01, Math.min(0.99, opp.market2.noPrice + change));
+                    
+                    // Recalculate profit
+                    const sum1 = opp.market1.yesPrice + opp.market1.noPrice;
+                    const sum2 = opp.market2.yesPrice + opp.market2.noPrice;
+                    opp.investment = Math.min(sum1, sum2);
+                    opp.profit = opp.investment < 1 ? ((1 / opp.investment - 1) * 100) : 0;
+                });
+                
+                renderOpportunities();
+                updateStats();
+            }, 5000);
+        }
+
+        // Position calculator
+        function calculatePosition(oppId) {
+            const opp = arbitrageOpportunities.find(o => o.id === oppId);
+            const bankroll = parseFloat(document.getElementById('bankroll').value) || 10000;
+            
+            if (opp) {
+                const kellyFraction = 0.25; // Conservative Kelly
+                const position = bankroll * kellyFraction * (opp.profit / 100);
+                const expectedReturn = position * (opp.profit / 100);
+                
+                document.getElementById('positionOutput').innerHTML = `
+                    <div class="calc-row">
+                        <span class="calc-label">Position Size:</span>
+                        <span class="calc-value">$${position.toFixed(2)}</span>
+                    </div>
+                    <div class="calc-row">
+                        <span class="calc-label">Expected Return:</span>
+                        <span class="calc-value">$${expectedReturn.toFixed(2)}</span>
+                    </div>
+                    <div class="calc-row">
+                        <span class="calc-label">ROI:</span>
+                        <span class="calc-value">${opp.profit.toFixed(2)}%</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Execute trade
+        function executeTrade(oppId) {
+            const opp = arbitrageOpportunities.find(o => o.id === oppId);
+            if (opp) {
+                alert(`Executing arbitrage:\n${opp.market1.question}\nvs\n${opp.market2.question}\n\nProfit: ${opp.profit.toFixed(2)}%`);
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+            
+            // Filter listeners
+            ['minProfit', 'maxProfit', 'minVolume', 'minLiquidity'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    renderOpportunities();
+                    updateStats();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
