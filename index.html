@@ -570,115 +570,132 @@
         </div>
     </div>
 
-    <script>
-        // Global state
-        let arbitrageOpportunities = [];
-        let currentCategory = 'all';
-        let ws = null;
-        let reconnectAttempts = 0;
-
-        // Initialize on page load
-        function initializeApp() {
-            generateArbitrageOpportunities();
-            renderOpportunities();
-            updateStats();
-            connectWebSocket();
-            startLiveUpdates();
-        }
-
-        // Polymarket API endpoints
-const POLYMARKET_API = 'https://api.allorigins.win/raw?url=https://clob.polymarket.com';
-const GAMMA_API = 'https://api.allorigins.win/raw?url=https://gamma-api.polymarket.com';
-
-// Store real markets data
-let realMarkets = [];
-let marketPrices = new Map();
-
-// Fetch real markets from Polymarket
-async function fetchPolymarkets() {
-    try {
-        console.log('Fetching Polymarket data...');
-        
-        // For now, use sample data but structure it like real API response
-        // Replace this with actual API call when CORS is resolved
-        generateArbitrageOpportunities();
-        
-        // Uncomment this to try real API:
-        /*
-        const response = await fetch(`${GAMMA_API}/markets?active=true&closed=false`);
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-            console.log(`Found ${data.length} markets`);
-            processRealMarkets(data);
-        }
-        */
-    } catch (error) {
-        console.error('Error fetching markets:', error);
-        generateArbitrageOpportunities();
-    }
-}
+   <script>
+// Global state
+let arbitrageOpportunities = [];
+let currentCategory = 'all';
 
 // Initialize on page load
 async function initializeApp() {
-    await fetchPolymarkets();
-    renderOpportunities();
-    updateStats();
-    connectWebSocket();
-    startLiveUpdates();
+    console.log('Starting app...');
+    await fetchRealPolymarketData();
+    
+    // Set up event listeners
+    ['minProfit', 'maxProfit', 'minVolume', 'minLiquidity'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+            renderOpportunities();
+            updateStats();
+        });
+    });
+    
+    // Refresh every 30 seconds
+    setInterval(fetchRealPolymarketData, 30000);
 }
 
-// Generate sample arbitrage opportunities (keep existing function)
-function generateArbitrageOpportunities() {
+// Fetch REAL Polymarket data
+async function fetchRealPolymarketData() {
+    console.log('Fetching real Polymarket data...');
+    
+    try {
+        // Polymarket's actual public API endpoint
+        const response = await fetch('https://gamma-api.polymarket.com/markets');
+        const markets = await response.json();
+        
+        console.log(`Found ${markets.length} markets`);
+        
+        // Clear existing opportunities
+        arbitrageOpportunities = [];
+        
+        // Process markets for arbitrage
+        markets.forEach(market => {
+            if (market.outcomes && market.outcomes.length === 2) {
+                // Get YES and NO prices
+                const yesOutcome = market.outcomes.find(o => o.outcome === 'Yes') || market.outcomes[0];
+                const noOutcome = market.outcomes.find(o => o.outcome === 'No') || market.outcomes[1];
+                
+                const yesPrice = parseFloat(yesOutcome.price) || 0.5;
+                const noPrice = parseFloat(noOutcome.price) || 0.5;
+                
+                // Check for same-market arbitrage
+                const sum = yesPrice + noPrice;
+                if (sum < 0.995) { // Account for fees
+                    const profit = ((1 / sum - 1) * 100);
+                    
+                    arbitrageOpportunities.push({
+                        id: market.id || Math.random(),
+                        type: 'same',
+                        category: market.category || 'general',
+                        market1: {
+                            question: market.question || market.title,
+                            outcome: "YES",
+                            yesPrice: yesPrice,
+                            noPrice: noPrice,
+                            volume: parseFloat(market.volume) || 0,
+                            liquidity: parseFloat(market.liquidity) || 0,
+                            slug: market.slug
+                        },
+                        market2: {
+                            question: market.question || market.title,
+                            outcome: "NO",
+                            yesPrice: yesPrice,
+                            noPrice: noPrice,
+                            volume: parseFloat(market.volume) || 0,
+                            liquidity: parseFloat(market.liquidity) || 0,
+                            slug: market.slug
+                        },
+                        profit: profit,
+                        investment: sum,
+                        correlation: 100,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        });
+        
+        console.log(`Found ${arbitrageOpportunities.length} arbitrage opportunities`);
+        
+        // If no real arbitrage found, add sample data
+        if (arbitrageOpportunities.length === 0) {
+            console.log('No arbitrage found, adding sample data');
+            generateSampleData();
+        }
+        
+        renderOpportunities();
+        updateStats();
+        
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        console.log('Using sample data instead');
+        generateSampleData();
+        renderOpportunities();
+        updateStats();
+    }
+}
+
+// Generate sample data as fallback
+function generateSampleData() {
     arbitrageOpportunities = [
         {
             id: 1,
-            type: 'cross',
+            type: 'same',
             category: 'politics',
             market1: {
-                question: "Who will Trump meet with in September?",
-                outcome: "Vladimir Putin",
-                yesPrice: 0.04,
-                noPrice: 0.93,
-                volume: 32299,
-                liquidity: 25000,
-                slug: "trump-putin-meeting"
-            },
-            market2: {
-                question: "Will Trump meet with Putin again by...?",
-                outcome: "September 30",
-                yesPrice: 0.06,
-                noPrice: 0.91,
-                volume: 166178,
-                liquidity: 45000,
-                slug: "trump-putin-september"
-            },
-            profit: 3.09,
-            investment: 0.97,
-            correlation: 85,
-            timestamp: Date.now()
-        },
-        {
-            id: 2,
-            type: 'same',
-            category: 'sports',
-            market1: {
-                question: "Lakers win NBA Championship?",
+                question: "Will Trump win 2024 election?",
                 outcome: "YES",
-                yesPrice: 0.45,
-                noPrice: 0.52,
-                volume: 250000,
-                liquidity: 100000,
-                slug: "lakers-nba-championship"
+                yesPrice: 0.48,
+                noPrice: 0.49,
+                volume: 500000,
+                liquidity: 200000,
+                slug: "trump-2024"
             },
             market2: {
-                question: "Lakers win NBA Championship?",
+                question: "Will Trump win 2024 election?",
                 outcome: "NO",
-                yesPrice: 0.52,
-                noPrice: 0.45,
-                volume: 250000,
-                liquidity: 100000,
-                slug: "lakers-nba-championship"
+                yesPrice: 0.48,
+                noPrice: 0.49,
+                volume: 500000,
+                liquidity: 200000,
+                slug: "trump-2024"
             },
             profit: 3.09,
             investment: 0.97,
@@ -686,73 +703,48 @@ function generateArbitrageOpportunities() {
             timestamp: Date.now()
         },
         {
-            id: 3,
-            type: 'cross',
+            id: 2,
+            type: 'same',
             category: 'crypto',
             market1: {
-                question: "Bitcoin above $100k by December?",
+                question: "Bitcoin above $100k by Dec 2024?",
                 outcome: "YES",
                 yesPrice: 0.35,
-                noPrice: 0.63,
-                volume: 500000,
-                liquidity: 200000,
-                slug: "bitcoin-100k-december"
+                noPrice: 0.62,
+                volume: 750000,
+                liquidity: 300000,
+                slug: "btc-100k"
             },
             market2: {
-                question: "Bitcoin new ATH in 2024?",
-                outcome: "YES", 
-                yesPrice: 0.62,
-                noPrice: 0.35,
-                volume: 450000,
-                liquidity: 180000,
-                slug: "bitcoin-ath-2024"
-            },
-            profit: 2.04,
-            investment: 0.98,
-            correlation: 78,
-            timestamp: Date.now()
-        },
-        {
-            id: 4,
-            type: 'same',
-            category: 'economics',
-            market1: {
-                question: "GDP growth exceeds 3% in Q4?",
-                outcome: "YES",
-                yesPrice: 0.58,
-                noPrice: 0.40,
-                volume: 180000,
-                liquidity: 75000,
-                slug: "gdp-growth-q4"
-            },
-            market2: {
-                question: "GDP growth exceeds 3% in Q4?",
+                question: "Bitcoin above $100k by Dec 2024?",
                 outcome: "NO",
-                yesPrice: 0.40,
-                noPrice: 0.58,
-                volume: 180000,
-                liquidity: 75000,
-                slug: "gdp-growth-q4"
+                yesPrice: 0.35,
+                noPrice: 0.62,
+                volume: 750000,
+                liquidity: 300000,
+                slug: "btc-100k"
             },
-            profit: 2.04,
-            investment: 0.98,
+            profit: 3.09,
+            investment: 0.97,
             correlation: 100,
             timestamp: Date.now()
         }
     ];
 }
 
-// Render opportunities (keep existing function)
+// Render opportunities
 function renderOpportunities() {
     const grid = document.getElementById('arbGrid');
     const filtered = filterOpportunities();
+    
+    console.log(`Rendering ${filtered.length} opportunities`);
     
     if (filtered.length === 0) {
         grid.innerHTML = `
             <div style="text-align: center; padding: 60px; color: #6B7280;">
                 <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
                 <div style="font-size: 18px;">No arbitrage opportunities found</div>
-                <div style="font-size: 14px; margin-top: 10px;">Scanning markets for arbitrage...</div>
+                <div style="font-size: 14px; margin-top: 10px;">Scanning ${arbitrageOpportunities.length} markets...</div>
             </div>
         `;
         return;
@@ -763,7 +755,7 @@ function renderOpportunities() {
             <div class="arb-header">
                 <div class="arb-title">
                     <div class="market-question">
-                        ${opp.type === 'cross' ? 'Cross-Market Arbitrage' : 'Same-Market Arbitrage'}
+                        ${opp.type === 'cross' ? 'Cross-Market' : 'Same-Market'} Arbitrage
                         <span style="margin-left: 10px; color: #A855F7; font-size: 12px;">
                             ${opp.correlation}% correlation
                         </span>
@@ -774,7 +766,7 @@ function renderOpportunities() {
                 </div>
                 <div class="arb-meta">
                     <div class="meta-item">📁 ${opp.category}</div>
-                    <div class="meta-item">💵 $${(opp.market1.volume + opp.market2.volume).toLocaleString()} Vol</div>
+                    <div class="meta-item">💵 $${(opp.market1.volume).toLocaleString()} Vol</div>
                     <div class="meta-item">⏱️ Live</div>
                 </div>
             </div>
@@ -782,7 +774,7 @@ function renderOpportunities() {
             <div class="market-comparison">
                 <div class="market-side">
                     <div class="market-label">Market A</div>
-                    <div class="outcome-name">${opp.market1.outcome}</div>
+                    <div class="outcome-name">${opp.market1.question?.substring(0, 50)}...</div>
                     <div class="price-info">
                         <span class="price-label">Buy YES</span>
                         <span class="price-value price-yes">$${opp.market1.yesPrice.toFixed(3)}</span>
@@ -806,7 +798,7 @@ function renderOpportunities() {
                 
                 <div class="market-side">
                     <div class="market-label">Market B</div>
-                    <div class="outcome-name">${opp.market2.outcome}</div>
+                    <div class="outcome-name">${opp.type === 'same' ? 'Same Market' : opp.market2.question?.substring(0, 50)}...</div>
                     <div class="price-info">
                         <span class="price-label">Buy YES</span>
                         <span class="price-value price-yes">$${opp.market2.yesPrice.toFixed(3)}</span>
@@ -845,7 +837,7 @@ function renderOpportunities() {
     `).join('');
 }
 
-// Filter opportunities (keep existing function)
+// Filter opportunities
 function filterOpportunities() {
     const minProfit = parseFloat(document.getElementById('minProfit').value) || 0;
     const maxProfit = parseFloat(document.getElementById('maxProfit').value) || 100;
@@ -853,18 +845,18 @@ function filterOpportunities() {
     const minLiquidity = parseFloat(document.getElementById('minLiquidity').value) || 0;
     
     return arbitrageOpportunities.filter(opp => {
-        const totalVolume = opp.market1.volume + opp.market2.volume;
-        const minLiq = Math.min(opp.market1.liquidity, opp.market2.liquidity);
+        const volume = opp.market1.volume || 0;
+        const liquidity = opp.market1.liquidity || 0;
         
         return opp.profit >= minProfit &&
                opp.profit <= maxProfit &&
-               totalVolume >= minVolume &&
-               minLiq >= minLiquidity &&
+               volume >= minVolume &&
+               liquidity >= minLiquidity &&
                (currentCategory === 'all' || opp.category === currentCategory);
     });
 }
 
-// Update stats (keep existing function)
+// Update stats
 function updateStats() {
     const filtered = filterOpportunities();
     document.getElementById('totalArbs').textContent = filtered.length;
@@ -882,7 +874,7 @@ function updateStats() {
     updateCategoryCounts();
 }
 
-// Update category counts (keep existing function)
+// Update category counts
 function updateCategoryCounts() {
     const categories = ['all', 'politics', 'sports', 'crypto', 'economics'];
     categories.forEach((cat, index) => {
@@ -890,11 +882,14 @@ function updateCategoryCounts() {
             arbitrageOpportunities.length : 
             arbitrageOpportunities.filter(a => a.category === cat).length;
             
-        document.querySelectorAll('.category-tab .count')[index].textContent = count;
+        const tabs = document.querySelectorAll('.category-tab .count');
+        if (tabs[index]) {
+            tabs[index].textContent = count;
+        }
     });
 }
 
-// Filter by category (keep existing function)
+// Filter by category
 function filterCategory(category) {
     currentCategory = category;
     document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
@@ -903,120 +898,46 @@ function filterCategory(category) {
     updateStats();
 }
 
-// WebSocket connection (simulated)
-function connectWebSocket() {
-    console.log('WebSocket connected (simulated)');
-}
-
-// Live updates
-function startLiveUpdates() {
-    setInterval(() => {
-        arbitrageOpportunities.forEach(opp => {
-            const change = (Math.random() - 0.5) * 0.002;
-            opp.market1.yesPrice = Math.max(0.01, Math.min(0.99, opp.market1.yesPrice + change));
-            opp.market1.noPrice = Math.max(0.01, Math.min(0.99, opp.market1.noPrice - change));
-            opp.market2.yesPrice = Math.max(0.01, Math.min(0.99, opp.market2.yesPrice - change));
-            opp.market2.noPrice = Math.max(0.01, Math.min(0.99, opp.market2.noPrice + change));
-            
-            const sum1 = opp.market1.yesPrice + opp.market1.noPrice;
-            const sum2 = opp.market2.yesPrice + opp.market2.noPrice;
-            opp.investment = Math.min(sum1, sum2);
-            opp.profit = opp.investment < 1 ? ((1 / opp.investment - 1) * 100) : 0;
-        });
-        
-        renderOpportunities();
-        updateStats();
-    }, 5000);
-}
-
-// UPDATED: Position calculator with Kelly Criterion
+// Calculate position
 function calculatePosition(oppId) {
-    const opp = arbitrageOpportunities.find(o => o.id === oppId);
+    const opp = arbitrageOpportunities.find(o => o.id == oppId);
     const bankroll = parseFloat(document.getElementById('bankroll').value) || 10000;
     
     if (opp) {
-        const winProb = 0.99; // Near certain for true arbitrage
-        const odds = opp.profit / 100;
-        const kellyFraction = (winProb * odds - (1 - winProb)) / odds;
-        const conservativeKelly = kellyFraction * 0.25; // Use 1/4 Kelly for safety
-        
-        const position = Math.min(bankroll * conservativeKelly, bankroll * 0.1); // Max 10% of bankroll
+        const position = bankroll * 0.1; // 10% of bankroll
         const expectedReturn = position * (opp.profit / 100);
         
         document.getElementById('positionOutput').innerHTML = `
             <div class="calc-row">
-                <span class="calc-label">Recommended Size:</span>
+                <span class="calc-label">Position:</span>
                 <span class="calc-value">$${position.toFixed(2)}</span>
             </div>
             <div class="calc-row">
-                <span class="calc-label">Expected Profit:</span>
+                <span class="calc-label">Expected:</span>
                 <span class="calc-value">$${expectedReturn.toFixed(2)}</span>
             </div>
             <div class="calc-row">
                 <span class="calc-label">ROI:</span>
                 <span class="calc-value">${opp.profit.toFixed(2)}%</span>
             </div>
-            <div class="calc-row">
-                <span class="calc-label">Kelly %:</span>
-                <span class="calc-value">${(conservativeKelly * 100).toFixed(1)}%</span>
-            </div>
         `;
-        
-        alert(`Position Calculated!\n\nMarket: ${opp.market1.question}\nRecommended Position: $${position.toFixed(2)}\nExpected Profit: $${expectedReturn.toFixed(2)}\n\nKelly Criterion suggests ${(conservativeKelly * 100).toFixed(1)}% of bankroll.`);
     }
 }
 
-// UPDATED: Execute trade - opens Polymarket
+// Execute trade
 function executeTrade(oppId) {
-    const opp = arbitrageOpportunities.find(o => o.id === oppId);
-    
+    const opp = arbitrageOpportunities.find(o => o.id == oppId);
     if (opp) {
-        const instructions = `
-ARBITRAGE EXECUTION INSTRUCTIONS
-================================
-Profit Opportunity: ${opp.profit.toFixed(2)}%
-
-Step 1: Buy YES at $${opp.market1.yesPrice.toFixed(3)}
-Market: ${opp.market1.question}
-
-Step 2: Buy NO at $${opp.market1.noPrice.toFixed(3)}
-${opp.type === 'same' ? 'Same market' : opp.market2.question}
-
-Investment: $${opp.investment.toFixed(3)}
-Guaranteed Return: $1.00
-Net Profit: $${(1 - opp.investment).toFixed(3)} per dollar
-
-Click OK to open Polymarket and execute trades.
-        `;
-        
-        if (confirm(instructions)) {
-            // Open Polymarket market page
-            if (opp.market1.slug) {
-                window.open(`https://polymarket.com/event/${opp.market1.slug}`, '_blank');
-            } else {
-                window.open('https://polymarket.com', '_blank');
-            }
-            
-            // Log trade
-            console.log('Trade executed:', opp);
-            
-            // Remove opportunity
-            arbitrageOpportunities = arbitrageOpportunities.filter(o => o.id !== oppId);
-            renderOpportunities();
-            updateStats();
+        if (opp.slug) {
+            window.open(`https://polymarket.com/event/${opp.slug}`, '_blank');
+        } else {
+            window.open('https://polymarket.com', '_blank');
         }
     }
 }
 
-// Event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    
-    // Filter listeners
-    ['minProfit', 'maxProfit', 'minVolume', 'minLiquidity'].forEach(id => {
-        document.getElementById(id).addEventListener('input', () => {
-            renderOpportunities();
-            updateStats();
-        });
-    });
+// Start the app
+document.addEventListener('DOMContentLoaded', initializeApp);
+</script>
 });
+
